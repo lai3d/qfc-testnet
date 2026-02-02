@@ -1,0 +1,148 @@
+groups:
+  - name: qfc-node-alerts
+    rules:
+      # Node down
+      - alert: QFCNodeDown
+        expr: up{job="qfc-validators"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "QFC Node {{ $labels.instance }} is down"
+          description: "QFC node {{ $labels.instance }} has been down for more than 1 minute."
+
+      # Block production stopped
+      - alert: BlockProductionStopped
+        expr: increase(qfc_blocks_produced_total[5m]) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Block production has stopped"
+          description: "No new blocks have been produced in the last 5 minutes."
+
+      # High block time
+      - alert: HighBlockTime
+        expr: qfc_block_time_seconds > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Block time is high"
+          description: "Average block time is {{ $value }}s, expected < 5s."
+
+      # Low validator count
+      - alert: LowValidatorCount
+        expr: qfc_active_validators < 3
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low active validator count"
+          description: "Only {{ $value }} validators are active. Minimum 3 required for consensus."
+
+      # Consensus fork detected
+      - alert: ConsensusFork
+        expr: count(count by (qfc_latest_block_hash) (qfc_latest_block_hash)) > 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Potential consensus fork detected"
+          description: "Multiple different block hashes detected at the same height."
+
+  - name: qfc-resource-alerts
+    rules:
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ humanizePercentage $value }}."
+
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ humanize $value }}%."
+
+      # Disk space low
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk space low on {{ $labels.instance }}"
+          description: "Only {{ humanizePercentage $value }} disk space remaining."
+
+      # Disk space critical
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk space critical on {{ $labels.instance }}"
+          description: "Only {{ humanizePercentage $value }} disk space remaining!"
+
+  - name: qfc-network-alerts
+    rules:
+      # Low peer count
+      - alert: LowPeerCount
+        expr: qfc_peer_count < 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low peer count on {{ $labels.instance }}"
+          description: "Node has only {{ $value }} peers connected."
+
+      # No peers
+      - alert: NoPeers
+        expr: qfc_peer_count == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node {{ $labels.instance }} has no peers"
+          description: "Node is isolated from the network."
+
+      # High network latency
+      - alert: HighNetworkLatency
+        expr: qfc_p2p_latency_ms > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High P2P latency on {{ $labels.instance }}"
+          description: "P2P latency is {{ $value }}ms."
+
+  - name: qfc-transaction-alerts
+    rules:
+      # High pending transactions
+      - alert: HighPendingTransactions
+        expr: qfc_mempool_size > 10000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High pending transaction count"
+          description: "Mempool has {{ $value }} pending transactions."
+
+      # Transaction failures
+      - alert: HighTransactionFailureRate
+        expr: rate(qfc_transactions_failed_total[5m]) / rate(qfc_transactions_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High transaction failure rate"
+          description: "Transaction failure rate is {{ humanizePercentage $value }}."

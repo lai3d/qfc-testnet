@@ -1,0 +1,65 @@
+# Prometheus Configuration - Multi Node (5 Validators)
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'qfc-testnet'
+    environment: 'testnet'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # QFC Validator Nodes
+  - job_name: 'qfc-validators'
+    static_configs:
+      - targets:
+        - 'node-1:6060'
+        - 'node-2:6060'
+        - 'node-3:6060'
+        - 'node-4:6060'
+        - 'node-5:6060'
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+):\d+'
+        replacement: '${1}'
+      - source_labels: [__address__]
+        target_label: node_id
+        regex: '([^:]+):\d+'
+        replacement: '${1}'
+
+  # Explorer
+  - job_name: 'explorer'
+    static_configs:
+      - targets: ['explorer:3000']
+    metrics_path: /api/metrics
+
+  # Nginx
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80']
+    metrics_path: /metrics
+
+  # Node Exporter (if deployed)
+  # - job_name: 'node-exporter'
+  #   static_configs:
+  #     - targets:
+  #       - 'node-1:9100'
+  #       - 'node-2:9100'
+  #       - 'node-3:9100'
+  #       - 'node-4:9100'
+  #       - 'node-5:9100'

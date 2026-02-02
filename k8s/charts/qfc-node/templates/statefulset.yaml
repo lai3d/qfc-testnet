@@ -1,0 +1,136 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "qfc-node.fullname" . }}
+  labels:
+    {{- include "qfc-node.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "qfc-node.fullname" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "qfc-node.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "qfc-node.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: init-genesis
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              if [ ! -f /data/genesis.json ]; then
+                cp /config/genesis.json /data/genesis.json
+              fi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: genesis
+              mountPath: /config
+      containers:
+        - name: qfc-node
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: QFC_CHAIN_ID
+              value: "{{ .Values.node.chainId }}"
+            - name: QFC_NETWORK
+              value: "{{ .Values.node.network }}"
+            - name: QFC_DATA_DIR
+              value: "{{ .Values.node.dataDir }}"
+            - name: QFC_LOG_LEVEL
+              value: "{{ .Values.node.logLevel }}"
+            - name: QFC_RPC_ADDR
+              value: "0.0.0.0:{{ .Values.service.rpc.port }}"
+            - name: QFC_WS_ADDR
+              value: "0.0.0.0:{{ .Values.service.ws.port }}"
+            - name: QFC_P2P_ADDR
+              value: "0.0.0.0:{{ .Values.service.p2p.port }}"
+            - name: QFC_METRICS_ADDR
+              value: "0.0.0.0:{{ .Values.service.metrics.port }}"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: QFC_VALIDATOR_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.validators.secretName }}
+                  key: $(POD_NAME)
+                  optional: true
+          ports:
+            - name: rpc
+              containerPort: {{ .Values.service.rpc.port }}
+              protocol: TCP
+            - name: ws
+              containerPort: {{ .Values.service.ws.port }}
+              protocol: TCP
+            - name: p2p
+              containerPort: {{ .Values.service.p2p.port }}
+              protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.service.metrics.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.node.dataDir }}
+      volumes:
+        - name: genesis
+          configMap:
+            name: {{ .Values.genesis.configMap }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - {{ .Values.persistence.accessMode }}
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+  {{- end }}

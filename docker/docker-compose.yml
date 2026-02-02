@@ -1,0 +1,218 @@
+# QFC Testnet - Single Node Development Environment
+# Usage: docker-compose up -d
+
+version: "3.8"
+
+services:
+  # ===========================================
+  # QFC Node (Single Validator)
+  # ===========================================
+  qfc-node:
+    image: qfc/node:latest
+    build:
+      context: ../../qfc-core
+      dockerfile: Dockerfile
+    container_name: qfc-node
+    restart: unless-stopped
+    ports:
+      - "${QFC_RPC_PORT:-8545}:8545"       # JSON-RPC
+      - "${QFC_WS_PORT:-8546}:8546"        # WebSocket
+      - "${QFC_P2P_PORT:-30303}:30303"     # P2P
+      - "${QFC_METRICS_PORT:-6060}:6060"   # Metrics
+    environment:
+      - QFC_CHAIN_ID=${QFC_CHAIN_ID:-9000}
+      - QFC_NETWORK=${QFC_NETWORK:-testnet}
+      - QFC_VALIDATOR_KEY=${VALIDATOR_1_KEY}
+      - QFC_RPC_ADDR=0.0.0.0:8545
+      - QFC_WS_ADDR=0.0.0.0:8546
+      - QFC_P2P_ADDR=0.0.0.0:30303
+      - QFC_METRICS_ADDR=0.0.0.0:6060
+      - QFC_DATA_DIR=/data
+      - QFC_LOG_LEVEL=info
+      - RUST_LOG=info,qfc=debug
+    volumes:
+      - qfc-node-data:/data
+      - ./genesis.json:/config/genesis.json:ro
+    networks:
+      - qfc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8545/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: ${NODE_MEMORY_LIMIT:-2g}
+          cpus: "${NODE_CPU_LIMIT:-2}"
+
+  # ===========================================
+  # PostgreSQL (Explorer Database)
+  # ===========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: qfc-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-qfc}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-qfc_password}
+      - POSTGRES_DB=${POSTGRES_DB:-qfc_explorer}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - qfc-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-qfc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # Redis (Cache)
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: qfc-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - qfc-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # Block Explorer
+  # ===========================================
+  explorer:
+    image: qfc/explorer:latest
+    build:
+      context: ../../qfc-explorer
+      dockerfile: Dockerfile
+    container_name: qfc-explorer
+    restart: unless-stopped
+    ports:
+      - "${EXPLORER_PORT:-3000}:3000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-qfc}:${POSTGRES_PASSWORD:-qfc_password}@postgres:5432/${POSTGRES_DB:-qfc_explorer}
+      - REDIS_URL=redis://redis:6379
+      - RPC_URL=http://qfc-node:8545
+      - WS_URL=ws://qfc-node:8546
+      - NEXT_PUBLIC_RPC_URL=${NEXT_PUBLIC_RPC_URL:-http://localhost:8545}
+      - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-ws://localhost:8546}
+      - NEXT_PUBLIC_CHAIN_ID=${QFC_CHAIN_ID:-9000}
+    depends_on:
+      qfc-node:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - qfc-network
+
+  # ===========================================
+  # Faucet
+  # ===========================================
+  faucet:
+    image: qfc/faucet:latest
+    build:
+      context: ../../qfc-faucet
+      dockerfile: Dockerfile
+    container_name: qfc-faucet
+    restart: unless-stopped
+    ports:
+      - "${FAUCET_PORT:-3001}:3000"
+    environment:
+      - RPC_URL=http://qfc-node:8545
+      - FAUCET_PRIVATE_KEY=${FAUCET_PRIVATE_KEY}
+      - FAUCET_AMOUNT=${FAUCET_AMOUNT:-100000000000000000000}
+      - COOLDOWN_SECONDS=${FAUCET_COOLDOWN:-86400}
+      - CHAIN_ID=${QFC_CHAIN_ID:-9000}
+    depends_on:
+      qfc-node:
+        condition: service_healthy
+    networks:
+      - qfc-network
+
+  # ===========================================
+  # Prometheus (Metrics)
+  # ===========================================
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: qfc-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/prometheus/rules/:/etc/prometheus/rules/:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - qfc-network
+
+  # ===========================================
+  # Grafana (Dashboards)
+  # ===========================================
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: qfc-grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3002}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:${GRAFANA_PORT:-3002}
+    volumes:
+      - ../monitoring/grafana/provisioning/:/etc/grafana/provisioning/:ro
+      - ../monitoring/grafana/dashboards/:/var/lib/grafana/dashboards/:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - qfc-network
+
+  # ===========================================
+  # AlertManager (Alerts)
+  # ===========================================
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: qfc-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - ../monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - qfc-network
+
+networks:
+  qfc-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  qfc-node-data:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+  alertmanager-data:

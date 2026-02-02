@@ -1,0 +1,103 @@
+# Default values for qfc-node
+
+# Number of validator nodes
+replicaCount: 3
+
+image:
+  repository: qfc/node
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# Node configuration
+node:
+  chainId: 9000
+  network: testnet
+  logLevel: info
+  dataDir: /data
+
+# Resource limits
+resources:
+  limits:
+    cpu: "2"
+    memory: 4Gi
+  requests:
+    cpu: "1"
+    memory: 2Gi
+
+# Persistence
+persistence:
+  enabled: true
+  storageClass: ""
+  size: 100Gi
+  accessMode: ReadWriteOnce
+
+# Service configuration
+service:
+  type: ClusterIP
+  rpc:
+    port: 8545
+  ws:
+    port: 8546
+  p2p:
+    port: 30303
+  metrics:
+    port: 6060
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: rpc.testnet.qfc.network
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Pod configuration
+podAnnotations: {}
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - qfc-node
+          topologyKey: kubernetes.io/hostname
+
+# Monitoring
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+    scrapeTimeout: 10s
+
+# Genesis configuration
+genesis:
+  configMap: qfc-genesis
+
+# Validator keys (stored as secrets)
+validators:
+  secretName: qfc-validator-keys

@@ -1,0 +1,35 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+crash.log
+
+# Docker
+docker/.env
+
+# Kubernetes
+*.kubeconfig
+
+# Secrets
+*.pem
+*.key
+**/secrets/
+**/ssl/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Data volumes (local testing)
+data/
