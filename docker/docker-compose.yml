@@ -30,6 +30,9 @@ services:
       - QFC_DATA_DIR=/data
       - QFC_LOG_LEVEL=info
       - RUST_LOG=info,qfc=debug
+      # Mining configuration (optional 20% compute contribution)
+      - QFC_MINING_ENABLED=${QFC_MINING_ENABLED:-false}
+      - QFC_MINING_THREADS=${QFC_MINING_THREADS:-2}
     volumes:
       - qfc-node-data:/data
       - ./genesis.json:/config/genesis.json:ro
