@@ -30,8 +30,10 @@ services:
       - QFC_DATA_DIR=/data
       - QFC_LOG_LEVEL=info
       - RUST_LOG=info,qfc=debug
+      # Dev mode (auto block production)
+      - QFC_DEV_MODE=${QFC_DEV_MODE:-true}
       # Mining configuration (optional 20% compute contribution)
-      - QFC_MINING_ENABLED=${QFC_MINING_ENABLED:-false}
+      - QFC_MINING_ENABLED=${QFC_MINING_ENABLED:-true}
       - QFC_MINING_THREADS=${QFC_MINING_THREADS:-2}
     volumes:
       - qfc-node-data:/data
