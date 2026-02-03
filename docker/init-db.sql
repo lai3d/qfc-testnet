@@ -16,7 +16,10 @@ CREATE TABLE IF NOT EXISTS blocks (
     size INT,
     extra_data TEXT,
     state_root VARCHAR(66),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Aliases for explorer compatibility
+    height BIGINT GENERATED ALWAYS AS (number) STORED,
+    timestamp_ms BIGINT GENERATED ALWAYS AS (timestamp) STORED
 );
 
 CREATE INDEX IF NOT EXISTS idx_blocks_hash ON blocks(hash);
@@ -40,7 +43,11 @@ CREATE TABLE IF NOT EXISTS transactions (
     status INT,
     contract_address VARCHAR(42),
     timestamp BIGINT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Aliases for explorer compatibility
+    block_height BIGINT GENERATED ALWAYS AS (block_number) STORED,
+    from_address VARCHAR(42) GENERATED ALWAYS AS ("from") STORED,
+    to_address VARCHAR(42) GENERATED ALWAYS AS ("to") STORED
 );
 
 CREATE INDEX IF NOT EXISTS idx_tx_block ON transactions(block_number);
