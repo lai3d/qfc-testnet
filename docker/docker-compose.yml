@@ -113,6 +113,8 @@ services:
       - NEXT_PUBLIC_RPC_URL=${NEXT_PUBLIC_RPC_URL:-http://localhost:8545}
       - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-ws://localhost:8546}
       - NEXT_PUBLIC_CHAIN_ID=${QFC_CHAIN_ID:-9000}
+      - NEXT_PUBLIC_BASE_URL=http://127.0.0.1:3000
+      - HOSTNAME=0.0.0.0
     depends_on:
       qfc-node:
         condition: service_healthy
