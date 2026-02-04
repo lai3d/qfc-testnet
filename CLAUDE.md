@@ -10,7 +10,10 @@ qfc-testnet/
 │   ├── docker-compose.yml      # 单节点开发
 │   ├── docker-compose.multi.yml # 多节点 (5 验证者)
 │   ├── genesis.json            # 创世区块配置
-│   └── nginx.conf              # 负载均衡配置
+│   ├── nginx.conf              # 负载均衡配置 (本地)
+│   ├── nginx.production.conf   # 负载均衡配置 (生产)
+│   ├── .env                    # 环境变量 (本地)
+│   └── .env.production.example # 环境变量示例 (生产)
 ├── k8s/                        # Kubernetes
 │   └── charts/qfc-node/        # Helm Chart
 ├── terraform/                  # 基础设施即代码
@@ -23,14 +26,58 @@ qfc-testnet/
     └── alertmanager/           # 告警
 ```
 
+## 部署模式
+
+### 本地开发 (Local)
+
+使用默认 `.env` 配置，服务通过 localhost 访问：
+
+```bash
+cd docker
+docker compose up -d qfc-node postgres redis explorer prometheus grafana
+```
+
+访问地址：
+- Explorer: http://localhost:3000
+- RPC: http://localhost:8545
+- Grafana: http://localhost:3002
+
+### 生产部署 (Production)
+
+1. 复制并修改配置文件：
+```bash
+cp .env.production.example .env
+# 编辑 .env，设置域名和安全密钥
+```
+
+2. 配置 SSL 证书（使用 Let's Encrypt）：
+```bash
+certbot certonly --standalone -d rpc.testnet.qfc.network \
+  -d explorer.testnet.qfc.network \
+  -d faucet.testnet.qfc.network \
+  -d grafana.testnet.qfc.network
+```
+
+3. 启动服务：
+```bash
+docker compose -f docker-compose.multi.yml up -d
+```
+
+访问地址（示例域名）：
+- Explorer: https://explorer.testnet.qfc.network
+- RPC: https://rpc.testnet.qfc.network
+- WebSocket: wss://rpc.testnet.qfc.network/ws
+- Faucet: https://faucet.testnet.qfc.network
+- Grafana: https://grafana.testnet.qfc.network
+
 ## 常用命令
 
 ```bash
 # 本地开发 (单节点)
-cd docker && docker-compose up -d
+cd docker && docker compose up -d
 
 # 本地测试网 (5节点)
-cd docker && docker-compose -f docker-compose.multi.yml up -d
+cd docker && docker compose -f docker-compose.multi.yml up -d
 
 # Kubernetes 部署
 helm install qfc ./k8s/charts/qfc-node -n qfc --create-namespace
@@ -39,8 +86,12 @@ helm install qfc ./k8s/charts/qfc-node -n qfc --create-namespace
 cd terraform/aws && terraform init && terraform apply
 
 # 查看日志
-docker-compose logs -f node-1
+docker compose logs -f qfc-node
 kubectl logs -f deployment/qfc-node -n qfc
+
+# 重建单个服务
+docker compose build explorer --no-cache
+docker compose up -d explorer
 ```
 
 ## 服务端口
@@ -55,6 +106,17 @@ kubectl logs -f deployment/qfc-node -n qfc
 | Faucet | 3001 | 测试币水龙头 |
 | Grafana | 3002 | 监控仪表板 |
 | Prometheus | 9090 | 指标服务 |
+
+## 环境变量
+
+关键配置项（在 `.env` 中设置）：
+
+| 变量 | 本地默认值 | 生产示例 |
+|------|-----------|----------|
+| `NEXT_PUBLIC_RPC_URL` | http://localhost:8545 | https://rpc.testnet.qfc.network |
+| `NEXT_PUBLIC_WS_URL` | ws://localhost:8546 | wss://rpc.testnet.qfc.network |
+| `NEXT_PUBLIC_BASE_URL` | http://127.0.0.1:3000 | https://explorer.testnet.qfc.network |
+| `GRAFANA_ROOT_URL` | http://localhost:3002 | https://grafana.testnet.qfc.network |
 
 ## 监控告警
 
