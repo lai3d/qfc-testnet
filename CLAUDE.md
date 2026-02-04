@@ -34,13 +34,24 @@ qfc-testnet/
 
 ```bash
 cd docker
-docker compose up -d qfc-node postgres redis explorer prometheus grafana
+
+# 核心服务 (node + explorer + postgres + redis)
+docker compose up -d
+
+# 包含监控 (+ prometheus + grafana + alertmanager)
+docker compose --profile monitoring up -d
+
+# 包含水龙头 (+ faucet)
+docker compose --profile faucet up -d
+
+# 全部服务
+docker compose --profile monitoring --profile faucet up -d
 ```
 
 访问地址：
 - Explorer: http://localhost:3000
 - RPC: http://localhost:8545
-- Grafana: http://localhost:3002
+- Grafana: http://localhost:3002 (需要 `--profile monitoring`)
 
 ### 生产部署 (Production)
 
@@ -73,11 +84,17 @@ docker compose -f docker-compose.multi.yml up -d
 ## 常用命令
 
 ```bash
-# 本地开发 (单节点)
+# 本地开发 (单节点，核心服务)
 cd docker && docker compose up -d
+
+# 本地开发 (含监控)
+cd docker && docker compose --profile monitoring up -d
 
 # 本地测试网 (5节点)
 cd docker && docker compose -f docker-compose.multi.yml up -d
+
+# 停止所有服务
+cd docker && docker compose --profile monitoring --profile faucet down
 
 # Kubernetes 部署
 helm install qfc ./k8s/charts/qfc-node -n qfc --create-namespace
