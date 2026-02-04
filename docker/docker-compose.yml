@@ -1,7 +1,8 @@
 # QFC Testnet - Single Node Development Environment
-# Usage: docker-compose up -d
-
-version: "3.8"
+# Usage:
+#   Local dev (core only):  docker compose up -d
+#   With monitoring:        docker compose --profile monitoring up -d
+#   All services:           docker compose --profile monitoring --profile faucet up -d
 
 services:
   # ===========================================
@@ -126,7 +127,7 @@ services:
       - qfc-network
 
   # ===========================================
-  # Faucet
+  # Faucet (optional - use --profile faucet)
   # ===========================================
   faucet:
     image: qfc/faucet:latest
@@ -135,6 +136,8 @@ services:
       dockerfile: Dockerfile
     container_name: qfc-faucet
     restart: unless-stopped
+    profiles:
+      - faucet
     ports:
       - "${FAUCET_PORT:-3001}:3000"
     environment:
@@ -150,12 +153,14 @@ services:
       - qfc-network
 
   # ===========================================
-  # Prometheus (Metrics)
+  # Prometheus (optional - use --profile monitoring)
   # ===========================================
   prometheus:
     image: prom/prometheus:v2.48.0
     container_name: qfc-prometheus
     restart: unless-stopped
+    profiles:
+      - monitoring
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
@@ -172,12 +177,14 @@ services:
       - qfc-network
 
   # ===========================================
-  # Grafana (Dashboards)
+  # Grafana (optional - use --profile monitoring)
   # ===========================================
   grafana:
     image: grafana/grafana:10.2.0
     container_name: qfc-grafana
     restart: unless-stopped
+    profiles:
+      - monitoring
     ports:
       - "${GRAFANA_PORT:-3002}:3000"
     environment:
@@ -194,12 +201,14 @@ services:
       - qfc-network
 
   # ===========================================
-  # AlertManager (Alerts)
+  # AlertManager (optional - use --profile monitoring)
   # ===========================================
   alertmanager:
     image: prom/alertmanager:v0.26.0
     container_name: qfc-alertmanager
     restart: unless-stopped
+    profiles:
+      - monitoring
     ports:
       - "9093:9093"
     volumes:
