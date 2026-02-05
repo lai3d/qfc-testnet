@@ -166,7 +166,7 @@ services:
       - "${FAUCET_PORT:-3001}:3000"
     environment:
       - RPC_URL=http://qfc-node:8545
-      - FAUCET_AMOUNT=${FAUCET_AMOUNT:-10}
+      - FAUCET_AMOUNT=${FAUCET_AMOUNT:-100}
       - COOLDOWN_HOURS=${COOLDOWN_HOURS:-24}
     depends_on:
       qfc-node:
