@@ -166,12 +166,9 @@ services:
     ports:
       - "${FAUCET_PORT:-3001}:3000"
     environment:
-      - RPC_URL=http://qfc-node:8545
+      - RPC_URL=http://host.docker.internal:8545
       - FAUCET_AMOUNT=${FAUCET_AMOUNT:-100}
       - COOLDOWN_HOURS=${COOLDOWN_HOURS:-24}
-    depends_on:
-      qfc-node:
-        condition: service_healthy
     networks:
       - qfc-network
 
